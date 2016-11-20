@@ -1236,7 +1236,7 @@ function CheckPermission($load = '', $action = '', $group = '')
  * @param  int    $uid    用户uid
  * @return bool
  */
-function CheckWeibaPermission($weiba_admin, $id, $action, $uid)
+function CheckWeibaPermission($weiba_admin, $id, $action, $uid = 0)
 {
     !$uid && $uid = $GLOBALS['ts']['mid'];
     //超级管理员判断
@@ -2538,6 +2538,113 @@ function getUserName($uid)
     return $userinfo['uname'];
 }
 
+
+/**
+ * 发送数据
+ * @param  String $url     请求的地址
+ * @param  Array  $header  自定义的header数据
+ * @param  Array  $content POST的数据
+ * @return String
+ */
+function tocurl($url, $header, $content)
+{
+    $ch = curl_init($url);
+    if (substr($url, 0, 5) == 'https') {
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); // 跳过证书检查
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, true);  // 从证书中检查SSL加密算法是否存在
+    }
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    // curl_setopt($ch, CURLOPT_URL, $url);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, $header);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($content));
+    $response = curl_exec($ch);
+    if ($error = curl_error($ch)) {
+        return json_encode($error);
+    }
+    curl_close($ch);
+
+    return $response;
+}
+
+
+/**
+ * 发送异步通知到直播服务器
+ * @Author   Wayne[qiaobin@zhiyicx.com]
+ * @DateTime 2016-10-13T01:20:12+0800
+ * @return [type] [description]
+ */
+function sendSyncNotify($uid, $uri = '', $data = array(), $header = array('Auth-Appid: zb60225160269831'))
+{
+    $return = array(
+            'status' => 0,
+            'msg' => '',
+        );
+    $zhibo_service = C('STREAM_SERVICE_URL');
+    $usid_prex = C('USID_PREX');
+    !$zhibo_service && $return['msg'] = '请配置直播服务器地址';
+    $usid = $uid ? $usid_prex.$uid : 0;
+    $data['usid'] = $usid;
+    $res = tocurl($zhibo_service, $header, $data);
+
+    return json_decode($res, true);
+}
+
+/**
+ * 从直播服务器获取直播用户信息
+ * @Author   Wayne[qiaobin@zhiyicx.com]
+ * @DateTime 2016-10-13T01:36:23+0800
+ * @param  string $uid [description]
+ * @return [type] [description]
+ */
+function getLiveUserInfo($uid = '')
+{
+    $return = array(
+                'status' => 0,
+                'message' => '',
+        );
+    !$uid && $return['message'] = '参数错误';
+    $zhibo_service = C('STREAM_SERVICE_URL');
+    $usid_prex = C('USID_PREX');
+    !$zhibo_service && $return['msg'] = '请配置直播服务器地址';
+    $usid = $uid ? $usid_prex.$uid : 0;
+    $data['usid'] = $usid;
+    $res = tocurl($zhibo_service, $header, $data);
+
+    return json_decode($res, true);
+}
+
+
+/**
+ * 删除直播用户信息，支持批量删除
+ * @Author   Wayne[qiaobin@zhiyicx.com]
+ * @DateTime 2016-10-13T01:37:28+0800
+ * @param  array  $usids [用户id数组，需要增加usid前缀，此处不做处理]
+ * @return [type] [description]
+ */
+function delLiveUserInfo($usids = array())
+{
+    $return = array(
+                'status' => 0,
+                'message' => '',
+        );
+    !$uid && $return['message'] = '参数错误';
+    $zhibo_service = C('STREAM_SERVICE_URL').'/';
+    $usid_prex = C('USID_PREX');
+    !$zhibo_service && $return['msg'] = '请配置直播服务器地址';
+    $data['usid'] = $usids;
+    $res = tocurl($zhibo_service, $header, $data);
+
+    return json_decode($res, true);
+}
+
+function getUserField($uid, $field)
+{
+    $userinfo = model('User')->getUserInfo($uid);
+
+    return $userinfo[$field];
+}
+
 function keyWordFilter($text)
 {
     return filter_keyword($text);
@@ -3150,4 +3257,164 @@ function RemoveXSS($val)
     }
 
     return $val;
+}
+
+/**
+ * 向智播服务器添加用户
+ * @Author   Wayne[qiaobin@zhiyicx.com]
+ * @DateTime 2016-10-14T09:52:22+0800
+ * @return [type] [description]
+ */
+function postUser()
+{
+
+        //检查是否设置直播地址
+        if (!$this->checkStreamServiceUrl()) {
+            return array(
+                    'status' => 0,
+                    'msg' => '请先设置直播服务器地址',
+                );
+        }
+        //获取直播服务器地址
+        $live_service = $this->getStreamServiceUrl();
+        //组装数据
+        $data = [
+            'usid' => $this->usid_prex.$this->mid, //传递uid增加前缀
+            'uname' => getUserName($this->mid), //用户名
+            'sex' => getUserField($this->mid, 'sex'),  //传递性别
+        ];
+
+    if ($this->mod->where(array('usid' => $data['usid']))->count() && !isset($data[ 'ticket'])) {
+        return array(
+                    'status' => 0,
+                    'msg' => '直播用户已经存在',
+                );
+        die;
+    }
+
+        //参数检测
+        if (in_array('', $data)) {
+            return array(
+                    'status' => 0,
+                    'msg' => '参数不完整',
+                );
+            die;
+        }
+
+    $result = json_decode(tocurl($this->Service_User_Url, $this->curl_header, $data), true);
+    if ($result['code'] == 1) {
+        $add_data['uid'] = $_SESSION['mid'];
+        $add_data['sex'] = $data['sex'];
+        $add_data['usid'] = $data['usid'];
+        $add_data['ticket'] = $result['data']['ticket'];
+        $add_data['uname'] = $data['uname'];
+        $add_data['ctime'] = $add_data['mtime'] = time();
+        if (!isset($data['ticket'])) {
+            if (!$this->mod->add($add_data)) {
+                //写入直播用户数据失败
+                    return array(
+                            'status' => 0,
+                            'msg' => '直播用户注册失败',
+                        );
+                die;
+            }
+
+            return array(
+                        'status' => 1,
+                        'msg' => '直播用户注册成功',
+                        'data' => $add_data,
+                    );
+            die;
+        } else {
+            unset($add_data['ctime']);
+            if (!$this->mod->where(array('usid' => $add_data[ 'usid' ]))->save($add_data)) {
+                //写入直播用户数据失败
+                    return array(
+                            'status' => 0,
+                            'msg' => '直播用户更新失败',
+                        );
+                die;
+            }
+
+            return array(
+                        'status' => 1,
+                        'msg' => '直播用户更新成功',
+                        'data' => $add_data,
+                    );
+            die;
+        }
+    }
+}
+
+
+/**
+ * 转换备注
+ * @Author Foreach[missu082500@163.cocm]
+ */
+function parse_remark($content)
+{
+    $content = preg_replace_callback('/@([\w\x{2e80}-\x{9fff}\-]+)/u', '_parse_remark', $content);
+
+    return $content;
+}
+
+/**
+ * 转换备注
+ * @Author Foreach[missu082500@163.cocm]
+ */
+function _parse_remark($result)
+{
+    $info = static_cache('user_info_uname_'.$result[1]);
+    if (!$info) {
+        $info = model('User')->getUserInfoByName($result[1]);
+        if (!$info) {
+            $info = 1;
+        }
+        static_cache('user_info_uname_'.$result[1], $info);
+    }
+
+    if ($info && $info['is_active'] && $info['is_audit'] && $info['is_init']) {
+        $remark = model('UserRemark')->getRemark($_SESSION['mid'], $info['uid']);
+
+        return $remark ? '@'.$remark : $result[0];
+    } else {
+        return $result[0];
+    }
+}
+
+/**
+ * 获取金币充值或提现兑换比例
+ * type gold - 充值金币 cash - 金币提现
+ * bs
+ */
+function getExchangeConfig($type = 'gold')
+{
+    $info = model('Xdata')->get('admin_Application:ZB_config');
+    switch ($type) {
+        case 'cash':
+            $value = 'cash_exchange_ratio_list';
+            $defaultconfig = array(
+                array('cash' => '1', 'gold' => '100'),
+                array('cash' => '2.5', 'gold' => '200'),
+            ); //后台未配置时的默认比例
+            break;
+        default:
+            $value = 'gold_exchange_ratio_list';
+            $defaultconfig = array(
+                array('cash' => '1', 'gold' => '100'),
+                array('cash' => '2.5', 'gold' => '200'),
+            ); //后台未配置时的默认比例
+            break;
+    }
+    if (!empty($info[$value])) {
+        $list = explode(',', $info[$value]); //分割存储
+        foreach ($list as $key => $value) {
+            $config = explode(':', $value);
+            $return[] = array('cash' => $config[0], 'gold' => $config[1]);
+        }
+    } else {
+        $return = $defaultconfig;
+    }
+
+    return $return;
 }

@@ -311,4 +311,20 @@ class PublicAction extends AdministratorAction
             echo 1;
         }
     }
+
+    /**
+     * 删除用户脏数据（昵称重复）
+     */
+    public function delTrashUser()
+    {
+        $sql = 'SELECT `uname` FROM `ts_user` GROUP BY `uname` HAVING count(`uname`) >1';
+        $rs = D()->query($sql);
+        foreach ($rs as $key => $value) {
+            $_rs = D('User')->where(array('uname' => $value['uname']))->select();
+            $uids = getSubByKey($_rs, 'uid');
+            $pos = array_search(min($uids), $uids);
+            unset($uids[$pos]);
+            D('User')->trueDeleteUsers($uids);
+        }
+    }
 }

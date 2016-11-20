@@ -574,10 +574,7 @@ class IndexAction extends Action
     {
         //检测用户是否被禁言
         if ($isDisabled = model('DisableUser')->isDisableUser($this->mid, 'post')) {
-            return array(
-                'status' => 0,
-                'msg' => '您已经被禁言了',
-            );
+            $this->error('您已被禁言！', $type);
         }
         if ($_GET['post_type'] == 'index') {
             $type = false;
@@ -761,10 +758,10 @@ class IndexAction extends Action
         $weiba_admin = getSubByKey(D('weiba_follow')->where($map)->order('level desc')->field('follower_uid')->findAll(), 'follower_uid');
         $weiba_manage = false;
         if (CheckWeibaPermission($weiba_admin, 0, 'weiba_global_top')
-                 || CheckWeibaPermission($weiba_admin, 0, 'weiba_top')
-                 || CheckWeibaPermission($weiba_admin, 0, 'weiba_recommend')
-                 || CheckWeibaPermission($weiba_admin, 0, 'weiba_edit')
-                 || CheckWeibaPermission($weiba_admin, 0, 'weiba_del')) {
+            || CheckWeibaPermission($weiba_admin, 0, 'weiba_top')
+            || CheckWeibaPermission($weiba_admin, 0, 'weiba_recommend')
+            || CheckWeibaPermission($weiba_admin, 0, 'weiba_edit')
+            || CheckWeibaPermission($weiba_admin, 0, 'weiba_del')) {
             $weiba_manage = true;
         }
         $this->assign('weiba_manage', $weiba_manage);
