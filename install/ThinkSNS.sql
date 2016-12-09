@@ -4384,7 +4384,7 @@ CREATE TABLE IF NOT EXISTS `ts_feed_topic` (
   `ctime` int(11) NOT NULL COMMENT '创建时间',
   `status` tinyint(1) NOT NULL DEFAULT '0' COMMENT '状态',
   `lock` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否锁定',
-  `domain` varchar(100) NOT NULL COMMENT '个性化地址',
+  `domain` varchar(100) NOT NULL DEFAULT '' COMMENT '个性化地址',
   `recommend` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否推荐',
   `recommend_time` int(11) DEFAULT '0' COMMENT '推荐时间',
   `des` text COMMENT '详细内容',
@@ -8282,7 +8282,7 @@ CREATE TABLE IF NOT EXISTS `ts_user` (
   `input_city` varchar(255) DEFAULT NULL COMMENT '手动提交地址',
   `is_fixed` tinyint(1) NOT NULL DEFAULT '1' COMMENT '分享框固定为发布状态',
   PRIMARY KEY (`uid`),
-  UNIQUE KEY `email` (`email`) USING BTREE,
+  KEY `email` (`email`) USING BTREE,
   KEY `login` (`phone`) USING BTREE,
   KEY `uname` (`uname`) USING BTREE
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8 AUTO_INCREMENT=1 ;
