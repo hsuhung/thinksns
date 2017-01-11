@@ -14,13 +14,8 @@ if (!ini_get('date.timezone') and function_exists('date_default_timezone_set')) 
 error_reporting(0);
 // set_time_limit(0);
 
-/* 新系统需要的一些配置 */
-define('TS_ROOT', dirname(__FILE__));        // Ts根
-define('TS_APPLICATION', TS_ROOT.'/apps'); // 应用存在的目录
-define('TS_CONFIGURE', TS_ROOT.'/config'); // 配置文件存在的目录
-define('TS_STORAGE', '/storage');            // 储存目录，需要可以公开访问，相对于域名根
 // 新的系统核心接入
-require TS_ROOT.'/src/Build.php';
+require dirname(__FILE__).'/src/bootstrap.php';
 
 //session 设置
 ini_set('session.cookie_httponly', 1);
