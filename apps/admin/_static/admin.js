@@ -1850,3 +1850,19 @@ admin.setReason = function(number){
     var number = number ? number : getChecked();
     ui.box.load(U('admin/Application/setReason')+'&number='+number,'驳回理由');
 };
+
+/* **** 后台发送系统消息 **** */
+admin.doSendMessageDisplay = function() {
+    $('#dl_user_group_id').hide();
+    $('#dl_uid').hide();
+};
+
+admin.doSendMessageType = function(type) {
+    if (Number(type) == 1) {
+        $('#dl_uid').hide();
+        $('#dl_user_group_id').show();
+    } else {
+        $('#dl_uid').show();
+        $('#dl_user_group_id').hide();
+    }
+};

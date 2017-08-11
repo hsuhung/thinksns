@@ -376,7 +376,7 @@ class ContentAction extends AdministratorAction
         $this->assign('pageTitle', $isRec ? L('PUBLIC_RECYCLE_BIN') : L('PUBLIC_FILE_MANAGEMENT'));
         $map['is_del'] = $isRec == 1 ? 1 : 0;    //未删除的
         !empty($_POST['attach_id']) && $map['attach_id'] = array('in', explode(',', $_POST['attach_id']));
-        $_POST['from'] > 1 && $map['from'] = t($_POST['from']);
+        $_POST['from'] > 0 && $map['from'] = intval($_POST['from'] - 1);
         !empty($_POST['name']) && $map['name'] = array('like', '%'.t($_POST['name']).'%');
 
         $listData = model('Attach')->getAttachList($map, '*', 'attach_id desc', 10);
@@ -439,7 +439,6 @@ class ContentAction extends AdministratorAction
 
         $this->pageKeyList = array('video_id', 'name', 'size', 'uid', 'ctime', 'from', 'DOACTION');
         $this->searchKey = array('video_id', 'name', 'from');
-
         $this->opt['from'] = array_merge(array('-1' => L('PUBLIC_ALL_STREAM')), $this->from);
         $this->pageTab[] = array('title' => '视频列表', 'tabHash' => 'list', 'url' => U('admin/Content/video'));
         $this->pageTab[] = array('title' => L('PUBLIC_RECYCLE_BIN'), 'tabHash' => 'rec', 'url' => U('admin/Content/videoRec'));
@@ -456,9 +455,8 @@ class ContentAction extends AdministratorAction
         $this->assign('pageTitle', $is_del ? L('PUBLIC_RECYCLE_BIN') : L('视频管理'));
         $map['is_del'] = $is_del == 1 ? 1 : 0;    //未删除的
         !empty($_POST['video_id']) && $map['video_id'] = array('in', explode(',', $_POST['video_id']));
-        $_POST['from'] > 1 && $map['from'] = t($_POST['from']);
+        $_POST['from'] > 0 && $map['from'] = intval($_POST['from'] - 1);
         !empty($_POST['name']) && $map['name'] = array('like', '%'.t($_POST['name']).'%');
-
         // $listData = model('Attach')->getAttachList($map,'*','attach_id desc',10);
         $listData = D('video')->where($map)->findPage(20);
 
@@ -516,6 +514,19 @@ class ContentAction extends AdministratorAction
         $this->opt['video_transfer_async'] = array(0 => '否', 1 => '是');
         $this->savePostUrl = U('admin/Content/do_video_config');
         $this->displayConfig($data);
+    }
+
+    //下载用户
+    public function download_user()
+    {
+        $this->assign('pageTitle', L('下载用户'));
+        $data = M('check_download')->findPage(20);
+
+        foreach ($data['data'] as &$value) {
+            $value['ctime'] = date('Y-m-d H:i', $value['ctime']);
+        }
+        $this->pageKeyList = array('phone', 'ctime');
+        $this->displayList($data);
     }
 
     public function do_video_config()
@@ -622,6 +633,9 @@ class ContentAction extends AdministratorAction
         $this->pageKeyList = array('topic_id', 'topic_name', 'note', 'domain', 'des', 'pic', 'topic_user', 'outlink', 'DOACTION');
         //dump($_POST);exit;
         $listData = model('FeedTopicAdmin')->getTopic('', $_REQUEST['recommend']);
+        foreach ($listData['data'] as $k => &$v) {
+            $v['note'] = "<div style='width:400px; border:0; margin:0; padding:0;'>".$v['note'].'</div>';
+        }
         //dump($listData);exit;
         $this->displayList($listData);
     }

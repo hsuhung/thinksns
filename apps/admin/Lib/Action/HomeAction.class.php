@@ -678,12 +678,14 @@ class HomeAction extends AdministratorAction
     public function message()
     {
         //$this->pageKeyList = array('user_group_id','type','content');
-        $this->pageKeyList = array('user_group_id', 'content');    //现在后台只支持发送系统消息
-        $this->opt['type'] = array('0' => L('PUBLIC_MAIL_INLOCALHOST'), '1' => 'Email');
+        $this->pageKeyList = array('user_type', 'user_group_id', 'uid', 'content');    //现在后台只支持发送系统消息
+        //$this->opt['type'] = array('0' => L('PUBLIC_MAIL_INLOCALHOST'), '1' => 'Email');
+        $this->opt['user_type'] = array('1' => '用户组', '2' => '指定用户');
         $groupHash = model('UserGroup')->getHashUsergroup();
         $this->opt['user_group_id'] = array_merge(array(0 => L('PUBLIC_ALL_USERS')), $groupHash);
         $this->savePostUrl = U('admin/Home/dosendmsg');
-        $this->notEmpty = array('content');
+        $this->notEmpty = array('user_type', 'user_group_id', 'uid', 'content');
+        $this->onload[] = 'admin.doSendMessageDisplay()';
         // $this->onsubmit = 'admin.checkMessage(this)';
         $this->displayConfig();
     }
@@ -701,13 +703,35 @@ class HomeAction extends AdministratorAction
         $checkContents = preg_replace('/<img(.*?)src=/i', 'img', $checkContent);
         $checkContents = preg_replace('/<embed(.*?)src=/i', 'img', $checkContents);
         if (strlen(t($checkContents)) == 0) {
+
             $this->error('系统信息内容不能为空');
         }
-        $this->assign('jumpUrl', U('admin/Home/message'));
-        if (model('Notify')->sendSystemMessage($_POST['user_group_id'], h($_POST['content']))) {
-            $this->success();
+        $type = intval($_POST['user_type']);
+        if ($type == 1) {
+            if (intval($_POST['user_group_id']) == 0) {
+                $uids = \Ts\Models\User::where('is_del', '0')
+                    ->lists('uid');
+            } else {
+                $uids = model('UserGroupLink')->where(array('user_group_id' => intval($_POST['user_group_id'])))->field('uid')->findAll();
+                $uids = getSubByKey($uids, 'uid');
+            }
+        } elseif ($type == 2) {
+            if (!$_POST['uid']) {
+                $this->error('请选择发送用户');
+            }
+            $uids = explode(',', $_POST['uid']);
         }
-        $this->error();
+        $messageData['node'] = 'sys_notify';
+        $messageData['appname'] = 'public';
+        $messageData['title'] = '系统消息';
+        $messageData['body'] = $_POST['content'];
+        model('Notify')->sendSystemMessageJpush($uids, $messageData);
+
+        $this->assign('jumpUrl', U('admin/Home/message'));
+        //if (model('Notify')->sendSystemMessage($_POST['user_group_id'], h($_POST['content']))) {
+        //    $this->error();
+        //}
+        $this->success();
     }
 
     /**

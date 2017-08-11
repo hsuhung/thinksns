@@ -31,7 +31,8 @@ class IndexAction extends Action
         $map = array();
         if ($setting['channel'] == '1') {
             //频道
-            $setting['channelid'] = explode(',', $setting['channelid']);
+            $setting['channelid'] = empty($setting['channelid']) ? null : explode(',', $setting['channelid']);
+
             $map['status'] = 1;
             if (!$setting['channelid']) {
                 $list = D('Channel', 'channel')->where($map)->order('rand()')->limit(8)->findAll();
@@ -143,10 +144,10 @@ class IndexAction extends Action
             //首页推荐帖子
             $order = 'is_index_time desc';
             $maps['is_index'] = 1;
-            $list = D('weiba_post')->field('weiba_id,post_id,title,content,index_img')->where($maps)->order($order)->select();
-            //如果首页推荐帖子不够6个，获取全局置顶，吧内置顶，最新回复帖子
-            if (count($list) < 6) {
-                $limit = 6 - count($list);
+            $list = D('weiba_post')->field('weiba_id,post_id,title,content,index_img')->where($maps)->limit(5)->order($order)->select();
+            //如果首页推荐帖子不够5个，获取全局置顶，吧内置顶，最新回复帖子
+            if (count($list) < 5) {
+                $limit = 5 - count($list);
                 $post_ids = getSubByKey($list, 'post_id');
                 $maps['post_id'] = array(
                         'not in',

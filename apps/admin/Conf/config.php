@@ -91,6 +91,7 @@ $menu = array(
                 L('PUBLIC_REPORT_MANAGEMENT')          => U('admin/Content/denounce'),
                 L('PUBLIC_TAG_MANAGEMENT')             => U('admin/Home/tag'),
                 L('PUBLIC_INVITE_CALCULATION')         => U('admin/Home/invatecount'),
+                '下载用户'                                 => U('admin/Content/download_user'),
                 // '模板管理'	=>	U('admin/Content/template'),
             ),
         ),
@@ -145,7 +146,7 @@ $menu = array(
 
 $app_list = model('App')->getConfigList();
 foreach ($app_list as $k => $v) {
-    if ($k == '找伙伴') {
+    if ($k == '找伙伴' || $k == 'Html5') {
         continue;
     }
     $menu['admin_menu']['apps'][L('PUBLIC_APP_MANAGEMENT')][$k] = $v;
