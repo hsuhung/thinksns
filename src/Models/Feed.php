@@ -96,4 +96,43 @@ class Feed extends Model
 
         return $images;
     }
+
+    /**
+     * 获取上传文件信息
+     * @author ZsyD<1251992018@qq.com>
+     * @return array
+     */
+    public function postfile()
+    {
+        if ($this->type != 'postfile') {
+            return array();
+        }
+        $_temp = (object) unserialize($this->data->feed_data);
+
+        $data = array(
+            'content' => $this->data->feed_content,
+            'file_count' => count((array) $_temp->attach_id),
+            'files' => array(),
+        );
+
+        if (!$data['content']) {
+            $data['content'] = $_temp->content ?: $_temp->body;
+        }
+
+        foreach (
+            Attach::whereIn('attach_id', (array) $_temp->attach_id)
+                ->select('attach_id', 'name', 'size', 'save_path', 'save_name', 'extension')
+                ->get()
+            as $file
+        ) {
+            array_push($data['files'], array(
+                'name' => $file->name,
+                'size' => byte_format($file->size),
+                'path' => $file->path,
+                'extension' => $file->extension
+            ));
+        }
+
+        return $data;
+    }
 } // END class Feed extends Model

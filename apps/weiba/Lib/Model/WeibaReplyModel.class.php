@@ -27,6 +27,9 @@ class WeibaReplyModel extends Model
     public function getReplyList($map = null, $order = 'reply_id desc', $limit = 10)
     {
         !isset($map['is_del']) && ($map['is_del'] = 0);
+        $feed_id = D('weiba_post')->where(['post_id'=>$map['post_id']])->getField('feed_id');
+        $comment = D('comment')->where(['row_id'=>$feed_id,'is_audit'=>1])->select();
+        $map['comment_id'] = ['in',getSubByKey($comment, 'comment_id')];
         $data = $this->where($map)->order($order)->findPage($limit);
         // // TODO:后续优化
         foreach ($data['data'] as &$v) {

@@ -449,7 +449,7 @@ class AccountAction extends Action
         $mobile = $user['phone'];
         $email = $user['email'];
 
-        $matchMobile = preg_match('/^[1][358]\d{9}$/', $mobile);
+        $matchMobile = preg_match('/^[1][34578]\d{9}$/', $mobile);
         $bindingMobile = ($matchMobile === 1) ? true : false;
         $this->assign('bindingMobile', $bindingMobile);
         $this->assign('mobile', $mobile);
@@ -1037,6 +1037,9 @@ class AccountAction extends Action
 
         // 积分变化记录
         $credit_record = D('credit_record')->where('uid='.$this->mid)->order('ctime DESC')->findPage(100);
+        foreach ($credit_record['data'] as &$v){
+            $v['action'] = getUserName($v['reason'])?'转给 '.getUserName($v['reason']):rtrim($v['action'],strrchr($v['action'],'-'));
+        }
         $this->assign('credit_record', $credit_record);
         $this->display();
     }
@@ -1083,8 +1086,14 @@ class AccountAction extends Action
             $this->error('积分转账失败');
         }
         $map['uid'] = $this->mid;
-        $map['action'] = '积分转出';
+        $map['type'] = 3;
+        $map['action'] = ['like','%转给%'];
         $credit_record = D('credit_record')->where($map)->order('ctime DESC')->findPage(100);
+        foreach ($credit_record['data'] as &$v){
+            $v['toUname'] = getUserName($v['reason'])?:rtrim(ltrim($v['action'],'转给'),strrchr($v['action'],'-'));
+            $detail = json_decode($v['detail']);
+            $v['score'] = abs($detail->score);
+        }
         $this->assign('credit_record', $credit_record);
         $this->display();
     }

@@ -144,36 +144,34 @@ class SearchAction extends Action
             $this->display('weiba');
         } elseif ($this->curType == 4) {     //搜索用户
             if ($this->key != '') {
-                if (t($_GET['Stime']) && t($_GET['Etime'])) {
-                    $Stime = strtotime(t($_GET['Stime']));
-                    $Etime = strtotime(t($_GET['Etime']));
-                    $this->assign('Stime', t($_GET['Stime']));
-                    $this->assign('Etime', t($_GET['Etime']));
-                }
-                $map['title'] = array(
-                        'like',
-                        '%'.$this->key.'%',
+                $map['subject'] = array(
+                    'like',
+                    '%'.$this->key.'%',
                 );
-                $list = M('blog')->where($map)->findPage(20);
-                foreach ($list['data'] as $k => $v) {
-                    preg_match_all('#<img.*?src="([^"]*)"[^>]*>#i', $v['content'], $match);
-                    foreach ($match[1] as $imgurl) {
-                        $imgurl = $imgurl;
-                        if (!empty($imgurl)) {
-                            $list['data'][$k]['img'][] = $imgurl;
+                $list = M('information_list')->where($map)->findPage(20);
+                foreach ($list['data'] as $k=>$subject) {
+                    if ($subject['logo'] > 0) {
+                        $list['data'][$k]['image'] = getImageUrlByAttachId($subject['logo'], '205', '160', true);
+                    } else {
+                        preg_match_all('/\<img(.*?)src\=\"(.*?)\"(.*?)\/?\>/is', $subject['content'], $image);
+                        $image = $image[2];
+                        if ($image && is_array($image) && count($image) >= 1) {
+                            $image = $image[array_rand($image)];
+                            if (!preg_match('/https?\:\/\//is', $image)) {
+                                $image = parse_url(SITE_URL, PHP_URL_SCHEME).'://'.parse_url(SITE_URL, PHP_URL_HOST).'/'.$image;
+                            }
                         }
+                        $list['data'][$k]['image'] = $image;
                     }
-                    $is_digg = M('blog_digg')->where('post_id='.$v['id'].' and uid='.$this->mid)->find();
-                    $list['data'][$k]['digg'] = $is_digg ? 'digg' : 'undigg';
-                    if (count($list[$k]['img']) == '0') {
-                        $list['data'][$k]['img'][] = ''; // 默认图
+                    if(mb_strlen($subject['abstract'],'utf8')> 145){
+                        $list['data'][$k]['abstract'] = getShort($subject['abstract'],145).'......';
                     }
-                    $list['data'][$k]['content'] = t($list['data'][$k]['content']);
+                    $list['data'][$k]['commentNum'] = $this->_getComentNum($subject['id']);
                 }
                 //dump($list);exit;
                 $this->assign('searchResult', $list);
             }
-            $this->display('blog');
+            $this->display('information');
         } elseif ($this->curType == 5) {     //搜索帖子
             if ($this->key != '') {
                 if (t($_GET['Stime']) && t($_GET['Etime'])) {
@@ -272,7 +270,20 @@ class SearchAction extends Action
             $this->display('post');
         }
     }
+    /**
+     * 获取评论数
+     *
+     * @param  int $sid 主题ID
+     * @return int 评论数
+     * @author Seven Du <lovevipdsw@vip.qq.com>
+     **/
+    private function _getComentNum($sid)
+    {
+        $where = '`is_del` = 0 AND `app` = \'Information\' AND `table` = \'%s\' AND `row_id` = %d';
+        $where = sprintf($where, 'information_list', intval($sid));
 
+        return model('Comment')->where($where)->field('comment_id')->count();
+    }
     private function _assignUserTag($uids)
     {
         $user_tag = model('Tag')->setAppName('User')->setAppTable('user')->getAppTags($uids);
@@ -397,7 +408,38 @@ class SearchAction extends Action
         }
         $this->display();
     }
-
+    public function information()
+    {
+        if ($this->key != '') {
+            $map['subject'] = array(
+                'like',
+                '%'.$this->key.'%',
+            );
+            $list = M('information_list')->where($map)->findPage(20);
+            foreach ($list['data'] as $k=>$subject) {
+                if ($subject['logo'] > 0) {
+                    $list['data'][$k]['image'] = getImageUrlByAttachId($subject['logo'], '205', '160', true);
+                } else {
+                    preg_match_all('/\<img(.*?)src\=\"(.*?)\"(.*?)\/?\>/is', $subject['content'], $image);
+                    $image = $image[2];
+                    if ($image && is_array($image) && count($image) >= 1) {
+                        $image = $image[array_rand($image)];
+                        if (!preg_match('/https?\:\/\//is', $image)) {
+                            $image = parse_url(SITE_URL, PHP_URL_SCHEME).'://'.parse_url(SITE_URL, PHP_URL_HOST).'/'.$image;
+                        }
+                    }
+                    $list['data'][$k]['image'] = $image;
+                }
+                if(mb_strlen($subject['abstract'],'utf8')> 118){
+                    $list['data'][$k]['abstract'] = getShort($subject['abstract'],118).'......';
+                }
+                $list['data'][$k]['commentNum'] = $this->_getComentNum($subject['id']);
+            }
+            //dump($list);exit;
+            $this->assign('searchResult', $list);
+        }
+        $this->display();
+    }
     public function weiba()
     {
         if ($this->key != '') {

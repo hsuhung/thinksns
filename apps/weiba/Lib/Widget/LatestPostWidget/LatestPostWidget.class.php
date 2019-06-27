@@ -20,9 +20,10 @@ class LatestPostWidget extends Widget
     {
         $list = $this->_getRelatedGroup($data);
         $var['uid'] = intval($data['uid']);
-        $var['weiba_id'] = intval($data['weiba_id']);
+        $var['post_id'] = intval($data['post_id']);
         $var['max'] = intval($data['max']);
-        $var['topic_list'] = $list;
+        $var['topic_list'] = $list['data'];
+        $var['totalPages'] = $list['totalPages']>10?10:$list['totalPages'];
         $var['title'] = $data['title'];
         $content = $this->renderFile(dirname(__FILE__).'/index.html', $var);
 
@@ -37,11 +38,11 @@ class LatestPostWidget extends Widget
     public function changeRelate()
     {
         $var['uid'] = $data['uid'] = intval(t($_POST['uid']));
-        $var['weiba_id'] = $data['weiba_id'] = intval(t($_POST['weiba_id']));
+        $var['post_id'] = $data['post_id'] = intval(t($_POST['post_id']));
         $var['max'] = $data['max'] = intval(t($_POST['max']));
         $list = $this->_getRelatedGroup($data);
-        $var['topic_list'] = $list;
-        $var['title'] = '热门帖子';
+        $var['topic_list'] = $list['data'];
+        $var['title'] = '最新帖子';
         $content = $this->renderFile(dirname(__FILE__).'/_index.html', $var);
         exit(json_encode($content));
     }
@@ -60,17 +61,10 @@ class LatestPostWidget extends Widget
         if (!$data['max']) {
             $data['max'] = 10;
         }
-        //$list = model( 'Cache' )->get('weiba_post_recommend');
-        if (!$list) {
-            $map1['weiba_id'] = $data['weiba_id'];
-            //$map1['post_time'] = array('gt',time()-604800);;
-            $map1['is_del'] = 0;
-            //dump($map1);
-            $list = M('weiba_post')->where($map1)->order('rand()')->limit($data['max'])->select();
-            !$list && $list = 1;
-            //model( 'Cache' )->set( 'weiba_post_recommend' , $list , 86400 );
-        }
-
+        $map1['post_id'] = array('neq', $data['post_id']);
+        $map1['is_del'] = 0;
+        $list = M('weiba_post')->where($map1)->order('post_time desc')->findPage($data['max']);
+        !$list && $list = 1;
         return $list;
     }
 }

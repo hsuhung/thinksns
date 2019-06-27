@@ -401,11 +401,15 @@ class WebMessageAction extends Action
         ));
 
         if ($result) {
-            if (isset($_POST['msgid'])) {
-                $this->pullMessage($_POST['room_id'], $_POST['msgid']);
-            } else {
-                $html = $this->buildMsgList(array($result));
-                $this->ajaxReturn($html, (int) $result['message_id'], 1);
+            if(!empty($result['send_message'])){
+                $this->ajaxReturn('', '所属用户组禁止发私信！', 0);
+            }else{
+                if (isset($_POST['msgid'])) {
+                    $this->pullMessage($_POST['room_id'], $_POST['msgid']);
+                } else {
+                    $html = $this->buildMsgList(array($result));
+                    $this->ajaxReturn($html, (int) $result['message_id'], 1);
+                }
             }
         } else {
             $this->ajaxReturn('', '发送失败', 0);

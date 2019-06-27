@@ -25,7 +25,7 @@ class WeibaProtocolModel extends Model
         }
         $uidStr = implode(',', $uidArr);
         M('weiba')->where("uid in ($uidStr) or admin_uid in ($uidStr)")->delete();
-        M('weiba_post')->where("post_uid in ($uidStr) or last_reply_uid in ($uidStr)")->delete();
+        M('weiba_post')->where("post_uid in ($uidStr) or lasty_reply_uid in ($uidStr)")->delete();
         M('weiba_reply')->where("uid in ($uidStr) or post_uid in ($uidStr)")->delete();
         M('weiba_follow')->where("follower_uid in ($uidStr)")->delete();
     }

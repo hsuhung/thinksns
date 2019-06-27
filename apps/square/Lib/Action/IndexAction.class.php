@@ -157,7 +157,7 @@ class IndexAction extends Action
                 $order = 'top desc,last_reply_time desc';
                 $_list = D('weiba_post')->field('post_id,title,content')->where($maps)->order($order)->limit($limit)->select();
             }
-            $weiba_hot = array_merge($list, $_list);
+            $weiba_hot = $_list ? array_merge($list, $_list) : $list;
             if ($weiba_hot[0]['index_img'] != null) {
                 //首页帖子图片换成缩略图
                 $index_img = model('Attach')->getAttachById($weiba_hot[0]['index_img']);

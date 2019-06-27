@@ -388,6 +388,7 @@ class IndexAction extends Action
             /* 解析emoji */
             $list['data'][$k]['title'] = formatEmoji(false, $v['title']);
             $list['data'][$k]['content'] = formatEmoji(false, $v['content']);
+            $list['data'][$k]['reply_count'] = D('comment')->where(['row_id'=>$v['feed_id'],'is_audit'=>1])->count();
         }
 
         $this->assign('list', $list);
@@ -701,21 +702,27 @@ class IndexAction extends Action
             $this->error($filterContentStatus['data'], $type);
         }
         $data['content'] = addslashes($filterContentStatus['data']);
+        if($filterTitleStatus['type'] ==2 || $filterContentStatus==2){
+            $data['is_del'] = $result['is_audit'] = 2;
+        }
+        $data['video_id'] = intval($_POST['weiba_video']);
         $res = D('weiba_post')->add($data);
         if ($res) {
-            D('Weiba')->setNewcount($weibaid);
-            D('weiba')->where('weiba_id='.$data['weiba_id'])->setInc('thread_count');
-            //同步到分享
-            // $feed_id = D('weibaPost')->syncToFeed($res,$data['title'],t($checkContent),$this->mid);
-            $feed_id = model('Feed')->syncToFeed('weiba', $this->mid, $res);
-            D('weiba_post')->where('post_id='.$res)->setField('feed_id', $feed_id);
-            //$this->assign('jumpUrl', U('weiba/Index/postDetail',array('post_id'=>$res)));
-            //$this->success('发布成功');
+            if($filterTitleStatus['type'] !=2 && $filterContentStatus!=2){
+                D('Weiba')->setNewcount($weibaid);
+                D('weiba')->where('weiba_id='.$data['weiba_id'])->setInc('thread_count');
+                //同步到分享
+                // $feed_id = D('weibaPost')->syncToFeed($res,$data['title'],t($checkContent),$this->mid);
+                $feed_id = model('Feed')->syncToFeed('weiba', $this->mid, $res);
+                D('weiba_post')->where('post_id='.$res)->setField('feed_id', $feed_id);
+                //$this->assign('jumpUrl', U('weiba/Index/postDetail',array('post_id'=>$res)));
+                //$this->success('发布成功');
 
-            $result['id'] = $res;
-            $result['feed_id'] = $feed_id;
-            //添加积分
-            model('Credit')->setUserCredit($this->mid, 'publish_topic');
+                $result['id'] = $res;
+                $result['feed_id'] = $feed_id;
+                //添加积分
+                model('Credit')->setUserCredit($this->mid, 'publish_topic');
+            }
             //更新发帖数
             D('UserData')->updateKey('weiba_topic_count', 1);
             if ($_GET['post_type'] == 'index') {
@@ -762,7 +769,14 @@ class IndexAction extends Action
         /* # 解析emoji’ */
         $post_detail['content'] = formatEmoji(false, $post_detail['content']);
         $post_detail['title'] = formatEmoji(false, $post_detail['title']);
-
+        if(!empty($post_detail['video_id'])){
+            $video = D('video')->where(['video_id'=>$post_detail['video_id']])->find();
+            if($video['extension'] == 'mp4'){
+                $post_detail['content'] = '<p><video id="example_video_1" class="video-js" width="554" height="auto" controls="controls" poster="'.SITE_URL.$video['image_path'].'"><source src="'.SITE_URL.$video['video_path'].'" type="video/mp4"></video></p>'.$post_detail['content'];
+            }else{
+                $this->assign('video_path', $video['video_path']);
+            }
+        }
         // $post_detail['content'] = html_entity_decode($post_detail['content'], ENT_QUOTES, 'UTF-8');
         $this->assign('post_detail', $post_detail);
         //dump($post_detail);
@@ -911,7 +925,25 @@ class IndexAction extends Action
                 $this->error('对不起，您没有权限进行该操作！');
             }
         }
-
+        if(!empty($post_detail['video_id'])) {
+            $video = D('video')->where(['video_id' => $post_detail['video_id']])->find();
+            $image_path = $video['extension']=='mp3'?'':SITE_URL.$video['image_path'];
+            $post_detail['video'] = [
+                'video_id' => $video['video_id'],
+                'name' => $video['name'],
+                'extension' => $video['extension'],
+                'video_path' => SITE_URL.$video['video_path'],
+                'image_path' => $image_path,
+                'size' => byte_format($video['size'])
+            ];
+        }
+        $video_config = model('Xdata')->get('admin_Content:video_config');
+        $defaultExt = ['mp4','mp3'];
+        $ext = $video_config['video_ext'] ? explode(',', $video_config['video_ext']) : $defaultExt;
+        $video_size = $video_config['video_size'] ? intval($video_config['video_size']) : 50;
+        $data['video_ext'] = implode(',', $ext);
+        $data['video_size'] = $video_size;
+        $this->assign($data);
         if ($this->mid == $post_detail['post_uid'] || CheckWeibaPermission($weiba_admin, 0, 'weiba_edit')) {
             $post_detail['attach'] = unserialize($post_detail['attach']);
             $this->assign('post_detail', $post_detail);
@@ -987,30 +1019,47 @@ class IndexAction extends Action
             $attach = array_map('intval', $attach);
             $data['attach'] = serialize($attach);
         }
+        $filterTitleStatus = filter_words($data['title']);
+        if (!$filterTitleStatus['status']) {
+            $this->error($filterTitleStatus['data']);
+        }
+        $data['title'] = $filterTitleStatus['data'];
+
+        $filterContentStatus = filter_words($data['content']);
+        if (!$filterContentStatus['status']) {
+            $this->error($filterContentStatus['data']);
+        }
+        $data['content'] = addslashes($filterContentStatus['data']);
+        if($filterTitleStatus['type'] ==2 || $filterContentStatus==2){
+            $result['is_audit'] = $data['is_del'] = 2;
+        }
+        $data['video_id'] = intval($_POST['weiba_video']);
         $res = D('weiba_post')->where('post_id='.$post_id)->save($data);
         if ($res !== false) {
             $post_detail = D('weiba_post')->where('post_id='.$post_id)->find();
             if (intval($_POST['log']) == 1) {
                 D('log')->writeLog($post_detail['weiba_id'], $this->mid, '编辑了帖子“<a href="'.U('weiba/Index/postDetail', array('post_id' => $post_id)).'" target="_blank">'.$post_detail['title'].'</a>”', 'posts');
             }
-            //同步到分享
-            $feedInfo = D('feed_data')->where('feed_id='.$post_detail['feed_id'])->find();
-            $datas = unserialize($feedInfo['feed_data']);
-            $datas['content'] = '【'.$data['title'].'】'.getShort(t($checkContent), 100).'&nbsp;';
-            $datas['body'] = $datas['content'];
-            $data1['feed_data'] = serialize($datas);
-            $data1['feed_content'] = $datas['content'];
-            $feed_id = D('feed_data')->where('feed_id='.$post_detail['feed_id'])->save($data1);
-            model('Cache')->rm('fd_'.$post_detail['feed_id']);
-            //清空转发此帖子分享的缓存
-            $repost_list = model('Feed')->where(array('app_row_table' => 'weiba_post', 'app_row_id' => $post_id, 'is_repost' => 1))->field('feed_id')->findAll();
-            if ($repost_list) {
-                foreach ($repost_list as $value) {
-                    model('Cache')->rm('fd_'.$value['feed_id']);
+            if($filterTitleStatus['type'] !=2 && $filterContentStatus!=2){
+                //同步到分享
+                $feedInfo = D('feed_data')->where('feed_id='.$post_detail['feed_id'])->find();
+                $datas = unserialize($feedInfo['feed_data']);
+                $datas['content'] = '【'.$data['title'].'】'.getShort(t($checkContent), 100).'&nbsp;';
+                $datas['body'] = $datas['content'];
+                $data1['feed_data'] = serialize($datas);
+                $data1['feed_content'] = $datas['content'];
+                $feed_id = D('feed_data')->where('feed_id='.$post_detail['feed_id'])->save($data1);
+                model('Cache')->rm('fd_'.$post_detail['feed_id']);
+                //清空转发此帖子分享的缓存
+                $repost_list = model('Feed')->where(array('app_row_table' => 'weiba_post', 'app_row_id' => $post_id, 'is_repost' => 1))->field('feed_id')->findAll();
+                if ($repost_list) {
+                    foreach ($repost_list as $value) {
+                        model('Cache')->rm('fd_'.$value['feed_id']);
+                    }
                 }
             }
-
-            return $this->ajaxReturn($post_id, '编辑成功', 1);
+            $result['post_id'] = $post_id;
+            return $this->ajaxReturn($result, '编辑成功', 1);
         } else {
             $this->error('编辑失败', true);
         }
@@ -1143,13 +1192,13 @@ class IndexAction extends Action
                     case '0':      //取消置顶
                         if ($currentValue == 1) {
                             D('log')->writeLog($post_detail['weiba_id'], $this->mid, '将帖子“<a href="'.U('weiba/Index/postDetail', array('post_id' => $post_id)).'" target="_blank">'.$post_detail['title'].'</a>”取消了吧内置顶', 'posts');
+                            //扣除积分
+                            model('Credit')->setUserCredit($post_detail['post_uid'], 'untop_topic_weiba');
                         } else {
                             D('log')->writeLog($post_detail['weiba_id'], $this->mid, '将帖子“<a href="'.U('weiba/Index/postDetail', array('post_id' => $post_id)).'" target="_blank">'.$post_detail['title'].'</a>”取消了全局置顶', 'posts');
+                            //扣除积分
+                            model('Credit')->setUserCredit($post_detail['post_uid'], 'untop_topic_all');
                         }
-
-                        //添加积分
-                        model('Credit')->setUserCredit($post_detail['post_uid'], 'untop_topic_all');
-
                         break;
                     case '1':     //设为吧内置顶
                             $config['typename'] = '吧内置顶';
@@ -1175,6 +1224,8 @@ class IndexAction extends Action
                 switch ($targetValue) {
                     case '0':     //取消精华
                         D('log')->writeLog($post_detail['weiba_id'], $this->mid, '将帖子“<a href="'.U('weiba/Index/postDetail', array('post_id' => $post_id)).'" target="_blank">'.$post_detail['title'].'</a>”取消了精华', 'posts');
+                        //扣除积分
+                        model('Credit')->setUserCredit($post_detail['post_uid'], 'undist_topic');
                         break;
                     case '1':     //设为精华
                             $config['typename'] = '精华';
@@ -1898,7 +1949,7 @@ class IndexAction extends Action
                 $sql = "SELECT a.* FROM `{$db_prefix}weiba_post` a, `{$db_prefix}weiba` b WHERE a.weiba_id=b.weiba_id AND ( b.`is_del` = 0 ) AND ( b.`status` = 1 )  AND ( a.`top` = 2 ) AND ( a.`is_del` = 0 ) ORDER BY a.top_time desc LIMIT ".$limit;
                 break;
             case 'topandrecomment':
-                $sql = "SELECT a.* FROM `{$db_prefix}weiba_post` a, `{$db_prefix}weiba` b WHERE a.weiba_id=b.weiba_id AND ( b.`is_del` = 0 ) AND ( b.`status` = 1 )  AND ( a.`recommend` = 1 ) AND ( a.`is_del` = 0 ) ORDER BY a.top desc,a.last_reply_time desc";
+                $sql = "SELECT a.* FROM `{$db_prefix}weiba_post` a, `{$db_prefix}weiba` b WHERE a.weiba_id=b.weiba_id AND ( b.`is_del` = 0 ) AND ( b.`status` = 1 )  AND ( a.`recommend` = 1 ) AND ( a.`is_del` = 0 ) ORDER BY a.top desc,a.top_time desc,a.recommend_time desc";
                 break;
             default:     //new
                 $sql = "SELECT a.* FROM `{$db_prefix}weiba_post` a, `{$db_prefix}weiba` b WHERE a.weiba_id=b.weiba_id AND ( b.`is_del` = 0 ) AND ( b.`status` = 1 )  AND ( a.`is_del` = 0 ) ORDER BY a.post_time desc LIMIT ".$limit;

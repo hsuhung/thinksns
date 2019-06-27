@@ -751,13 +751,30 @@ class ConfigAction extends AdministratorAction
         $this->_sensitiveTab();
 
         $this->pageKeyList = array('word', 'type_name', 'replace', 'sensitive_category', 'uname', 'format_ctime', 'DOACTION');
-
+        $this->pageButton[] = array('title' => '搜索', 'onclick' => "admin.fold('search_form')");
         $this->pageButton[] = array('title' => '新增敏感词', 'onclick' => 'admin.setSensitiveBox()');
         // $this->pageButton[] = array('title'=>'删除', 'onclick'=>"admin.rmSensitive('search_form')");
-
-        $listData = model('SensitiveWord')->getSensitiveWordList();
+        $this->searchKey = array('word', 'type_name', 'replace', 'sensitive_category', 'uid');
+        $categoryList = D('sensitive_category')->getHashList($k = 'sensitive_category_id', $v = 'title');
+        $categoryList[0] = L('PUBLIC_SYSTEMD_NOACCEPT');
+        $this->opt['sensitive_category'] = $categoryList;
+        $this->opt['type_name'] = [0=>'不限',1=>'禁止关键词',2=>'审核关键词',3=>'替换关键词'];
+        if (isset($_POST)) {
+            // 搜索时用到
+            $_POST['word'] && $map['word'] = array(
+                'like',
+                '%'.$_POST['word'].'%',
+            );
+            $_POST['type_name'] && $map['type'] = intval($_POST['type_name']);
+            $_POST['replace'] && $map['replace'] = array(
+                'like',
+                '%'.$_POST['replace'].'%',
+            );
+            $_POST['sensitive_category'] && $map['sensitive_category_id'] = intval($_POST['sensitive_category']);
+            $_POST['uid'] && $map['uid'] = intval($_POST['uid']);
+        }
+        $listData = model('SensitiveWord')->getSensitiveWordList($map);
         foreach ($listData['data'] as &$value) {
-            $value['sensitive_category'] = $value['sensitive_category'];
             if (in_array($value['type'], array(1, 2))) {
                 $value['replace'] = '<span style="color:blue;cursor:auto;">无</span>';
             }
@@ -834,11 +851,79 @@ class ConfigAction extends AdministratorAction
 
         $this->displayTree($treeData, 'sensitive_category', 1);
     }
+    //导入敏感词
+    public function importSensitive(){
+        $this->_sensitiveTab();
+        $this->pageKeyList = array('file');
+        // 表单URL设置
+        $this->savePostUrl = U('admin/Config/doImportSensitive');
+        $this->displayConfig();
+    }
+    public function doImportSensitive()
+    {
+        $attach_id = trim($_POST['file_ids'], '|') ?: 0;
+        if ($attach_id) {
+            $attach = model('Attach')->getAttachById($attach_id);
+            if (!in_array($attach['extension'], ['xls', 'xlsx'])) {
+                $this->error('请重新上传导入附件');
+            } else {
+                //检测文件是否存在
+                $file_path = implode(DIRECTORY_SEPARATOR, array(SITE_PATH, 'data', 'upload', $attach['save_path'] . $attach['save_name']));
+                //导入PHPExcel
+                tsload(implode(DIRECTORY_SEPARATOR, array(SITE_PATH, 'PHPExcel', 'PHPExcel.php')));
+                $excel = PHPExcel_IOFactory::load($file_path);
+                $sheet = $excel->getActiveSheet(0);
+                $data  = $sheet->toArray();
+                $field = array('word', 'type', 'replace', 'sensitive_category_id');
+                //循环获取excel中的值
+                $add_count   = 0;
+                $total_count = 0;
+                if (!empty($data)) {
+                    foreach ($data as $key => $value) {
+                        if(empty(t($value[0])) || empty(intval($value[1])) || empty(intval($value[3]))){
+                            $this->error('导入失败,第'.($key+1).'行数据不完整');
+                        }
+                        if(!in_array(intval($value[1]),[1,2,3])){
+                            $this->error('导入失败,第'.($key+1).'行过滤动作不存在');
+                        }
+                        if(intval($value[1])==3 && t($value[2])==""){
+                            $this->error('导入失败,第'.($key+1).'行需填写规则');
+                        }
+                        if(!is_numeric($value[3])){
+                            $this->error('导入失败,第'.($key+1).'行敏感词分类Id必须为数字');
+                        }
+                    }
+                    foreach ($data as $key => $value) {
+                        if ($key > 0 && $value[0]) {
+                            $total_count++;
+                            $word = t($value[0]);
+                            $type   = intval($value[1]);
+                            $replace = intval($value[1])==3 ?t($value[2]): '';
+                            $cid = intval($value[3]);
+                            $res = model('SensitiveWord')->setSensitiveWord($word, $replace, $type, $cid, $this->mid);
+                            if ($res) {
+                                $add_count++;
+                            }
+                        }
+                    }
+                }
+                if ($add_count > 0) {
+                    $this->jumpUrl = U('admin/Config/sensitive');
+                    $this->success('共计' . $total_count . '个敏感词,本次成功导入' . $add_count . '个敏感词');
+                } else {
+                    $this->error('导入失败,请检查数据格式或敏感词是否重复导入');
+                }
+            }
+
+        }
+        $this->error('请重新上传导入附件');
+    }
 
     private function _sensitiveTab()
     {
         $this->pageTab[] = array('title' => L('PUBLIC_FILTER_SETTING'), 'tabHash' => 'sensitive', 'url' => U('admin/Config/sensitive'));
         $this->pageTab[] = array('title' => '敏感词分类', 'tabHash' => 'sensitiveCategory', 'url' => U('admin/Config/sensitiveCategory'));
+        $this->pageTab[] = array('title' => '导入', 'tabHash' => 'importSensitive', 'url' => U('admin/Config/importSensitive'));
         // $this->pageTab[] = array('title'=>'敏感审核', 'tabHash'=>'sensitiveAudit', 'url'=>U('admin/Config/sensitiveAudit'));
     }
 
@@ -2123,8 +2208,8 @@ class ConfigAction extends AdministratorAction
         $this->pageTab[] = array('title' => '直播版充值配置', 'tabHash' => 'ZBcharge', 'url' => U('admin/Config/ZBcharge'));
         $this->pageTab[] = array('title' => '提现配置', 'tabHash' => 'ZB_config', 'url' => U('admin/Application/ZB_config'));
 
-        $this->pageKeyList = array('charge_ratio', 'description', 'charge_platform', 'alipay_pid', 'alipay_key', 'alipay_email', 'alipay_app_pid', 'private_key_path', 'alipay_public_key', 'weixin_pid', 'weixin_mid', 'weixin_key');
-        $this->opt['charge_platform'] = array(
+        $this->pageKeyList = array('charge_ratio', 'description', 'android', 'ios', 'charge_platform', 'alipay_pid', 'alipay_key', 'alipay_email', 'alipay_app_pid', 'private_key_path', 'alipay_public_key', 'weixin_pid', 'weixin_mid', 'weixin_key');
+        $this->opt['android'] = $this->opt['ios'] = $this->opt['charge_platform'] = array(
             'alipay' => '支付宝',
             'weixin' => '微信支付',
         );

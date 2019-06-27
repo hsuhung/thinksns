@@ -185,6 +185,11 @@ PS：手动升级覆盖文件后千万不要刷新本页面，直接点击上方
         $data = file_get_contents($filename);
         $data = json_decode($data, false);
         if (md5_file($path) != $data->md5) {
+            // 检验失败删除文件
+            $filesystem = new Symfony\Component\Filesystem\Filesystem();
+            $filesystem->remove($path);
+
+            // 显示错误消息
             $this->showError('更新包校验失败，请重新执行升级.');
         }
 

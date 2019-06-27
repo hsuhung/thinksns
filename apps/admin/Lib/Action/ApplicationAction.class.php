@@ -40,7 +40,7 @@ class ApplicationAction extends AdministratorAction
      **/
     public function index()
     {
-        $this->pageKeyList = array('title', 'image', 'type', 'data', 'doAction');
+        $this->pageKeyList = array('title', 'image', 'type', 'data','rank', 'doAction');
         array_push($this->pageTab, array(
             'title'   => '轮播列表',
             'tabHash' => 'index',
@@ -52,7 +52,7 @@ class ApplicationAction extends AdministratorAction
             'url'     => U('admin/Application/addSlide'),
         ));
 
-        $list = D('application_slide')->findPage(20);
+        $list = D('application_slide')->order('rank asc')->findPage(20);
 
         foreach ($list['data'] as $key => $value) {
             // # 参数
@@ -65,7 +65,9 @@ class ApplicationAction extends AdministratorAction
             $value = '<a href="%s" target="_blank"><img src="%s" width="300px" height="140px"></a>';
             $value = sprintf($value, getImageUrlByAttachId($aid), getImageUrlByAttachId($aid, 300, 140));
             $list['data'][$key]['image'] = $value;
-
+            $mvSlide1 = "admin.mvSlide(".$id.",'up')";
+            $mvSlide2 = "admin.mvSlide(".$id.",'down')";
+            $list['data'][$key]['rank'] = '<label><a href="javascript:;" class="ico-top" onclick="'.$mvSlide1.'"></a></label><label><a href="javascript:;" class="ico-btm" onclick="'.$mvSlide2.'"></a></label>';
             // # 添加操作按钮
             $value = '[<a href="%s">编辑</a>]&nbsp;-&nbsp;[<a href="%s">删除</a>]';
             $value = sprintf($value, U('admin/Application/addSlide', array('id' => $id, 'tabHash' => 'addSlide')), U('admin/Application/delSlide', array('id' => $id)));
@@ -76,7 +78,42 @@ class ApplicationAction extends AdministratorAction
 
         $this->displayList($list);
     }
+    /**
+     * 移动发现轮播操作.
+     *
+     * @param int $id    发现轮播ID - A
+     * @param int $baseId 发现轮播ID - B
+     *
+     * @return bool 是否移动成功
+     */
+    public function doMvSlide()
+    {
+        $id = intval($_POST['id']);
+        $baseId = intval($_POST['baseId']);
+        $map['id'] = array('IN', array($id, $baseId));
+        $order = D('application_slide')->where($map)->select();
+        if (count($order) < 2) {
+            $result['status'] = 0;
+            $result['info'] = '操作失败';
+        }
+        foreach ($order as $v){
+            if($v['id'] == $baseId){
+                $res = D('application_slide')->where('`id`='.$id)->setField('rank', $v['rank']);
+            }
+            if($v['id'] == $id){
+                $res = D('application_slide')->where('`id`='.$baseId)->setField('rank',$v['rank']);
+            }
+        }
+        if ($res) {
+            $result['status'] = 1;
+            $result['info'] = '操作成功';
+        } else {
+            $result['status'] = 0;
+            $result['info'] = '操作失败';
+        }
 
+        exit(json_encode($result));
+    }
     /**
      * 添加|修改 幻灯.
      *
@@ -142,6 +179,7 @@ class ApplicationAction extends AdministratorAction
             S('api_discover_system', null);
             $this->success('修改成功');
         }
+        $data['rank'] = D('application_slide')->count();
         D('application_slide')->data($data)->add() or $this->error('添加失败');
 
         $this->assign('jumpUrl', U('admin/Application/index'));
@@ -247,7 +285,7 @@ class ApplicationAction extends AdministratorAction
 
         foreach ($list['data'] as $key => $value) {
             $data = array();
-            $data['content'] = $value['content'];
+            $data['content'] = formatEmoji(false,$value['content']);
             $data['user'] = getUserName($value['uid']);
             $data['time'] = friendlyDate($value['cTime']);
 
@@ -295,7 +333,7 @@ class ApplicationAction extends AdministratorAction
     //app端直播支付相关配置 bs
     public function ZB_config()
     {
-        $this->pageKeyList = array('version', 'cash_exchange_ratio_list');
+        $this->pageKeyList = array('version', 'android', 'ios', 'cash_exchange_ratio_list');
         $this->pageTab[] = array('title' => '充值配置', 'tabHash' => 'charge', 'url' => U('admin/Config/charge'));
         $this->pageTab[] = array('title' => '直播版充值配置', 'tabHash' => 'ZBcharge', 'url' => U('admin/Config/ZBcharge'));
         array_push($this->pageTab, array(
@@ -303,6 +341,10 @@ class ApplicationAction extends AdministratorAction
             'tabHash' => 'ZB_config',
             'url'     => U('admin/Application/ZB_config'),
         ));
+        $this->opt['android'] = $this->opt['ios'] = array(
+            'alipay' => '支付宝',
+            'weixin' => '微信支付',
+        );
 
         $this->displayConfig();
     }
@@ -313,9 +355,9 @@ class ApplicationAction extends AdministratorAction
         $this->pageTab[] = array('title' => '提现记录', 'tabHash' => 'ZB_credit_order', 'url' => U('admin/Application/ZB_credit_order'));
         $this->pageButton[] = array('title' => '搜索记录', 'onclick' => "admin.fold('search_form')");
         $this->pageButton[] = array('title' => '批量驳回', 'onclick' => 'admin.setReason()');
-        $this->pageKeyList = array('order_number', 'uid', 'uname', 'account', 'gold', 'amount', 'ctime', 'utime', 'status', 'DOACTION');
+        $this->pageKeyList = array('order_number', 'type', 'uid', 'uname', 'account', 'gold', 'amount', 'ctime', 'utime', 'status', 'DOACTION');
         $this->searchKey = array('uid', 'order_number', 'account');
-        $this->$searchPostUrl = U('admin/Application/ZB_credit_order');
+        $this->searchPostUrl = U('admin/Application/ZB_credit_order');
         $this->_listpk = 'order_number';
         if ($_POST) {
             $_POST['uid'] && $map['uid'] = $_POST['uid'];
@@ -324,6 +366,7 @@ class ApplicationAction extends AdministratorAction
         }
         $list = D('credit_order')->where($map)->findPage(20);
         foreach ($list['data'] as $key => &$value) {
+            $value['type'] = $value['type'] == 1 ? '支付宝' : ($value['type'] == 2 ? '微信' : '');
             if ($value['status'] == 0) {
                 $value['DOACTION'] = '<a href="'.U('admin/Application/pass', array('number' => $value['order_number'])).'">处理</a> ';
                 $value['DOACTION'] .= ' <a href="javascript:;" onclick="admin.setReason(\''.$value['order_number'].'\')">驳回</a>';
@@ -419,5 +462,151 @@ class ApplicationAction extends AdministratorAction
                 return array('message' => '操作失败', 'status' => 1);
             }
         }
+    }
+
+    /**
+     * APP端微博来源设置
+     *
+     * @author zsy
+     */
+    public function configureFrom()
+    {
+        $this->pageTab[] = array('title' => 'APP端配置微博来源', 'tabHash' => 'configureFrom', 'url' => U('admin/Application/configureFrom'));
+        $this->pageKeyList = array('phone', 'mobile', 'iPhone', 'iPad', 'windows', 'h5', 'web');
+
+        $this->displayConfig();
+    }
+
+    /* *********************APP版本start************************* */
+    /**
+     * 更新安卓安装包页面
+     */
+    public function versionByAndroid()
+    {
+        array_push($this->pageTab, array(
+            'title' => 'Android版本设置',
+            'tabHash' => 'versionByAndroid',
+            'url' => U('admin/Application/versionByAndroid'),
+        ));
+        array_push($this->pageTab, array(
+            'title' => 'Ios版本设置',
+            'tabHash' => 'versionByIos',
+            'url' => U('admin/Application/versionByIos'),
+        ));
+        //$this->pageButton('Android');
+        $version = $_REQUEST['version']?:'';//app版本
+        $versionInfo = model('Xdata')->get('admin_Application:versionByAndroid'.$version);
+        $apkUrl = SITE_URL.'/public/'.$version.'/'.($versionInfo['apk']?:'ts-Android'.$version.'.apk');
+        $this->assign($versionInfo);
+        $this->assign('apkUrl', $apkUrl);
+        $this->display();
+    }
+
+    /**
+     * 执行上传安装包
+     */
+    public function saveAndroidVersion()
+    {
+        if ($_POST) {
+            $appVersion = $_REQUEST['appVersion']?:'';
+            $versionInfo = 'admin_Application:versionByAndroid'.$appVersion;
+            $Info = model('Xdata')->get($versionInfo);
+            $tmp_file_path = SITE_PATH.'/public/'.$appVersion.'/';//在根目录下增加tmp目录的路径
+            $fileurl = $tmp_file_path.($Info['apk']?:'ts-Android.apk');
+            if(!file_exists($tmp_file_path)){
+                mkdir($tmp_file_path, 0777);//如果不存在tmp目录，则建立
+            }
+            if ($_FILES['apk']['name']) {
+                if ($_FILES['apk']['error'] > 0) {
+                    $this->error('文件上传出错');
+                }
+                $type = substr($_FILES['apk']['name'], strpos($_FILES['apk']['name'], '.') + 1);
+                if ($type != 'apk') {
+                    $this->error('文件类型错误');
+                }
+                unlink($tmp_file_path.$_FILES['apk']['name']);
+                unlink($fileurl);
+                move_uploaded_file($_FILES['apk']['tmp_name'], $tmp_file_path.$_FILES['apk']['name']);
+            }
+            if ($_POST['version']) {
+                $data['version'] = $_POST['version'];
+                $data['is_update'] = $_POST['is_update'];
+                if(!$_FILES['apk']['name']){
+                    $versionInfo = model('Xdata')->get('admin_Application:versionByAndroid');
+                    $apk = $versionInfo['apk'];
+                }else{
+                    $apk = $_FILES['apk']['name'];
+                }
+                $data['apk'] = $apk;
+                $data['title'] = $_POST['title'];
+                $data['explain'] = $_POST['explain'];
+                model('Xdata')->put($versionInfo, $data);
+            }
+        }
+
+        $this->success('保存成功');
+    }
+
+    /**
+     * 更新Ios版本
+     */
+    public function versionByIos()
+    {
+        $_REQUEST['tabHash'] = 'versionByIos';
+        if ($_POST) {
+            $appVersion = $_REQUEST['appVersion']?:'';
+            $versionInfo = 'admin_Application:versionByIos'.$appVersion;
+            $data['version'] = $_POST['version'];
+            $data['appstore_link'] = $_POST['appstore_link'];
+            $data['is_update'] = $_POST['is_update'];
+            $data['title'] = $_POST['title'];
+            $data['explain'] = $_POST['explain'];
+            model('Xdata')->put($versionInfo, $data);
+            $this->success('保存成功');
+        }else{
+            array_push($this->pageTab, array(
+                'title' => 'Android版本设置',
+                'tabHash' => 'versionByAndroid',
+                'url' => U('admin/Application/versionByAndroid'),
+            ));
+            array_push($this->pageTab, array(
+                'title' => 'Ios版本设置',
+                'tabHash' => 'versionByIos',
+                'url' => U('admin/Application/versionByIos'),
+            ));
+            //$this->pageButton('Ios');
+            $version = $_REQUEST['version'];//app版本
+            $versionInfo = model('Xdata')->get('admin_Application:versionByIos'.$version);
+            $this->assign($versionInfo);
+            $this->display();
+        }
+    }
+    //app版本
+    public function pageButton($version = 'Android'){
+        $pageButton[] = array('title' =>'系统版', 'onclick' => "location.href = '".U('admin/Application/versionBy'.$version)."'");
+        $pageButton[] = array('title' =>'聊天版', 'onclick' => "location.href = '".U('admin/Application/versionBy'.$version,['version'=>'Chat'])."'");
+        $pageButton[] = array('title' =>'图片版', 'onclick' => "location.href = '".U('admin/Application/versionBy'.$version,['version'=>'Image'])."'");
+        $pageButton[] = array('title' =>'圈子社交版', 'onclick' => "location.href = '".U('admin/Application/versionBy'.$version,['version'=>'Circle'])."'");
+        $pageButton[] = array('title' =>'视频版', 'onclick' => "location.href = '".U('admin/Application/versionBy'.$version,['version'=>'Video'])."'");
+        $pageButton[] = array('title' =>'媒体版', 'onclick' => "location.href = '".U('admin/Application/versionBy'.$version,['version'=>'Media'])."'");
+        $pageButton[] = array('title' =>'人脉版', 'onclick' => "location.href = '".U('admin/Application/versionBy'.$version,['version'=>'Contacts'])."'");
+        $pageButton[] = array('title' =>'直播版', 'onclick' => "location.href = '".U('admin/Application/versionBy'.$version,['version'=>'Live'])."'");
+        $this->assign('pageButton', $pageButton);
+    }
+    /* *********************APP版本end************************* */
+
+    /**
+     * APP配置
+     */
+    public function postContentAuthen(){
+        $this->pageKeyList = array('postContentAuthenByAndroid', 'postContentAuthenByIos','weiboContent','weibaTitle','weibaContent','weiboComment','weibaComment','eventComment','informationComment');
+        array_push($this->pageTab, array(
+            'title' => 'APP配置',
+            'tabHash' => 'postContentAuthen',
+            'url' => U('admin/Application/postContentAuthen'),
+        ));
+        $this->opt['postContentAuthenByAndroid'] = array('0' => '否', '1' => '是');
+        $this->opt['postContentAuthenByIos'] = array('0' => '否', '1' => '是');
+        $this->displayConfig();
     }
 } // END class ApplicationAction extends AdministratorAction
