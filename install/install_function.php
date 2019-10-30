@@ -51,14 +51,14 @@ function result($result = 1, $output = 1)
         echo $text;
     }
 }
-function createtable($sql, $db_charset)
+function createtable($conn, $sql, $db_charset)
 {
     $db_charset = (strpos($db_charset, '-') === false) ? $db_charset : str_replace('-', '', $db_charset);
     $type = strtoupper(preg_replace("/^\s*CREATE TABLE\s+.+\s+\(.+?\).*(ENGINE|TYPE)\s*=\s*([a-z]+?).*$/isU", '\\2', $sql));
     $type = in_array($type, array('MYISAM', 'HEAP')) ? $type : 'MYISAM';
 
     return preg_replace("/^\s*(CREATE TABLE\s+.+\s+\(.+?\)).*$/isU", '\\1', $sql).
-        (mysql_get_server_info() > '4.1' ? " ENGINE=$type DEFAULT CHARSET=$db_charset" : " TYPE=$type");
+        (mysqli_get_server_info($conn) > '4.1' ? " ENGINE=$type DEFAULT CHARSET=$db_charset" : " TYPE=$type");
 }
 function getip()
 {
