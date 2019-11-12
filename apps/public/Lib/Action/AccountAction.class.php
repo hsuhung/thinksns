@@ -413,7 +413,7 @@ class AccountAction extends Action
         if (strlen($domain) > 20) {
             $this->ajaxReturn(null, L('PUBLIC_SHORT_DOMAIN_CHARACTERLIMIT'), 0); // 域名长度不能超过20个字符
         }
-        if (!ereg('^[a-zA-Z][_a-zA-Z0-9]+$', $domain)) {
+        if (!preg_match('^[a-zA-Z][_a-zA-Z0-9]+$', $domain)) {
             $this->ajaxReturn(null, '仅限于英文/数字/下划线，以英文字母开头，不能含有特殊字符', 0); // 仅限5个字符以上20个字符以内的英文/数字/下划线，以英文字母开头，不能含有特殊字符，一经设置，无法更改。
         }
 

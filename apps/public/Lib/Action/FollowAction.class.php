@@ -21,7 +21,7 @@ class FollowAction extends Action
     /**
      * 添加关注操作.
      *
-     * @return json 返回操作后的JSON信息数据
+     * @return void 返回操作后的JSON信息数据
      */
     public function doFollow()
     {
@@ -35,7 +35,7 @@ class FollowAction extends Action
     /**
      * 取消关注操作.
      *
-     * @return json 返回操作后的JSON信息数据
+     * @return void 返回操作后的JSON信息数据
      */
     public function unFollow()
     {
@@ -48,7 +48,7 @@ class FollowAction extends Action
     /**
      * 批量添加关注操作.
      *
-     * @return json 返回操作后的JSON信息数据
+     * @return void 返回操作后的JSON信息数据
      */
     public function bulkDoFollow()
     {

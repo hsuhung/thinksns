@@ -40,12 +40,12 @@ class DatabaseModel extends Model
 
             if ($numrows && $tableData) {
                 $linkid = $this->db->connect();
-                $query = mysql_query($sql);
+                $query = mysqli_query($linkid, $sql);
 
-                while ($oneRow = mysql_fetch_assoc($query)) {
+                while ($oneRow = mysqli_fetch_assoc($linkid, $query)) {
                     $dumpsql = $comma = '';
                     foreach ($oneRow as $field => $value) {
-                        $dumpsql .= $comma."'".mysql_escape_string($value)."'";
+                        $dumpsql .= $comma."'".mysqli_escape_string($linkid, $value)."'";
                         $comma = ',';
                     }
 
@@ -97,7 +97,7 @@ class DatabaseModel extends Model
         foreach ($sqlquery as $sql) {
             $sql = trim($sql);
             if (!empty($sql)) {
-                $ret = mysql_query($sql);
+                $ret = mysqli_query($linkid, $sql);
             }
         }
 

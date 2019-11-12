@@ -1,6 +1,6 @@
 <?php
 
-tsload(APPS_PATH.'/admin/Lib/Action/AdministratorAction.class.php');
+tsload(+APPS_PATH.'/admin/Lib/Action/AdministratorAction.class.php');
 
 /**
  * 升级程序.
@@ -82,13 +82,13 @@ class UpgradeAction extends AdministratorAction
     /**
      * 显示消息.
      *
-     * @param string $message 消息
-     * @param string $type    [success|error] 消息类型
-     * @param string $url     跳转的url
-     * @param int    $s       等待的时间
+     * @param  string  $message  消息
+     * @param  string  $type  [success|error] 消息类型
+     * @param  bool  $url  跳转的url
+     * @param  int  $s  等待的时间
      *
      * @author Medz Seven <lovevipdsw@vip.qq.com>
-     **/
+     */
     public function showMessage($message, $type, $url = false, $s = 3)
     {
         $this->assign('message', $message);
@@ -130,8 +130,10 @@ class UpgradeAction extends AdministratorAction
     /**
      * 显示升级信息.
      *
+     * @param $log
+     * @param $downUrl
      * @author Medz Seven <lovevipdsw@vip.qq.com>
-     **/
+     */
     private function showUpgrade($log, $downUrl)
     {
         $this->savePostUrl = U('admin/Upgrade/step1', array('upurl' => urlencode($downUrl)));
@@ -184,7 +186,7 @@ PS：手动升级覆盖文件后千万不要刷新本页面，直接点击上方
         $filename = dirname($path).'/upgrade.json';
         $data = file_get_contents($filename);
         $data = json_decode($data, false);
-        if (md5_file($path) != $data->md5) {
+        if (md5_file($path) !== $data->md5) {
             // 检验失败删除文件
             $filesystem = new Symfony\Component\Filesystem\Filesystem();
             $filesystem->remove($path);
