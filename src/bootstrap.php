@@ -31,7 +31,7 @@ define('SITE_PATH', TS_ROOT);
 /**
  * 自动加载.
  */
-$file = dirname(__FILE__).'/vendor/autoload.php';
+$file = dirname(basename(dirname(dirname(__FILE__)))).'/vendor/autoload.php';
 if (!file_exists($file)) {
     echo '<pre>';
     echo 'You must set up the project dependencies, run the following commands:', PHP_EOL,
